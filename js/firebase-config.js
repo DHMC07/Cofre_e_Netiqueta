@@ -13,13 +13,16 @@
    ===================================================================== */
 window.CONFIG = {
   firebase: {
-    apiKey: "COLE_AQUI",
-    authDomain: "COLE_AQUI",
-    projectId: "COLE_AQUI",
-    storageBucket: "COLE_AQUI",
-    messagingSenderId: "COLE_AQUI",
-    appId: "COLE_AQUI"
+    apiKey: "AIzaSyDiSfj2Z6Nc5FsMx7fvksfn5FLrmbe7YYs",
+    authDomain: "cofre-e-netiqueta.firebaseapp.com",
+    databaseURL: "https://cofre-e-netiqueta-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "cofre-e-netiqueta",
+    storageBucket: "cofre-e-netiqueta.firebasestorage.app",
+    messagingSenderId: "1069444075829",
+    appId: "1:1069444075829:web:951051489e859ec26f3c7c",
+    measurementId: "G-WX3SBDF5CL"
   },
+
 
   turmas: ["4.º A", "4.º B", "4.º C", "4.º D", "4.º E", "4.º F", "4.º G", "4.º H", "4.º I"],
 

@@ -12,6 +12,7 @@ service cloud.firestore {
     function cofreDados(d) {
       return d.prog is map && d.prog.size() <= 5
         && d.passo is string && d.passo.size() <= 60
+        && (d.cur == null || (d.cur is map && d.cur.size() <= 5))
         && (d.cadeado == null || (d.cadeado is map && d.cadeado.size() <= 8))
         && d.estrelas is int && d.estrelas >= 0 && d.estrelas <= 15
         && d.concluido is bool
@@ -34,10 +35,10 @@ service cloud.firestore {
     // Trabalho de cada aluno
     match /cofre_registos/{id} {
       allow list: if cofreProf();
-      allow get: if cofreProf()
-        || (cofreAluno() && (resource == null || resource.data.uid == request.auth.uid));
+      // O aluno lê o seu registo pelo nome e turma, para continuar onde parou (mesmo noutro computador)
+      allow get: if cofreProf() || cofreAluno();
       allow create: if cofreAluno()
-        && request.resource.data.keys().hasOnly(['uid','nome','nomeNorm','turma','prog','passo','cadeado','estrelas','concluido','estado','apoio','criado','atualizado'])
+        && request.resource.data.keys().hasOnly(['uid','nome','nomeNorm','turma','prog','passo','cur','cadeado','estrelas','concluido','estado','apoio','criado','atualizado'])
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.nome is string && request.resource.data.nome.size() >= 3 && request.resource.data.nome.size() <= 60
         && request.resource.data.nomeNorm is string && request.resource.data.nomeNorm.size() <= 60
@@ -48,9 +49,9 @@ service cloud.firestore {
         && cofreDados(request.resource.data);
       // O aluno só atualiza o seu progresso, e só até o professor validar
       allow update: if cofreProf() || (cofreAluno()
-        && resource.data.uid == request.auth.uid
         && resource.data.estado == 'em_curso'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['prog','passo','cadeado','estrelas','concluido','atualizado'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uid','prog','passo','cur','cadeado','estrelas','concluido','atualizado'])
         && cofreDados(request.resource.data));
       allow delete: if cofreProf();
     }

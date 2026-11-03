@@ -28,14 +28,14 @@
   <div class="pwrap"><div class="pgrid">
     <aside class="side">
       <div class="card"><label class="lab" for="turmaSel" style="margin-top:0">Turma</label><select class="inp" id="turmaSel"></select></div>
-      <div class="card">
+      <div class="card" id="missCard">
         <h2>Missões abertas</h2>
         <p class="note">Abra cada missão quando chegar a essa parte da aula. Abre logo em todos os computadores da turma.</p>
         <div id="missRows"></div>
         <div class="mbtns" style="justify-content:flex-start;margin-top:12px"><button class="btn small" id="openNext">🔓 Abrir a próxima</button><button class="btn ghost small" id="closeAll">Fechar todas</button></div>
         <div class="pmsg" id="ctlMsg"></div>
       </div>
-      <details class="card">
+      <details class="card" id="listaCard">
         <summary class="lab" style="margin:0;cursor:pointer;font-size:17px;color:var(--ink)">📋 Lista da turma</summary>
         <p class="note">Um aluno por linha (nome e apelido). Ponha <b>*</b> no fim do nome dos alunos com medidas seletivas, por exemplo <b>Ana Silva *</b>. Assim vê também quem ainda não começou.</p>
         <textarea class="inp" id="lista" rows="9" style="font-size:16px"></textarea>
@@ -65,9 +65,10 @@
         <label style="display:flex;gap:6px;align-items:center;font-weight:800"><input type="checkbox" id="showVal"> Mostrar validados</label>
       </div>
       <div class="card" style="padding:0;overflow-x:auto"><table class="res">
-        <thead><tr><th>Aluno</th><th>Onde está</th><th>1 · Níveis</th><th>2 · Netiqueta</th><th>3 · Cenários</th><th>4 · Cadeado</th><th>5 · Promessa</th><th>Medidas</th><th>Estado</th><th></th></tr></thead>
+        <thead><tr><th>Aluno</th><th></th><th>Onde está</th><th>1 · Níveis</th><th>2 · Netiqueta</th><th>3 · Cenários</th><th>4 · Cadeado</th><th>5 · Promessa</th><th>Medidas</th><th>Estado</th></tr></thead>
         <tbody id="rows"><tr><td colspan="10" class="note" style="text-align:center;padding:30px">A carregar…</td></tr></tbody>
       </table></div>
+      <p class="note">Um aluno escolheu a turma errada? Carregue em <b>👁️ Ver</b> e use <b>Mudar de turma</b> (fica com o trabalho que já fez) ou <b>🗑️</b> para o eliminar. Em «Todas as turmas» encontra qualquer aluno.</p>
       <p class="note">Ao validar, o certificado do aluno recebe o carimbo «Validado pelo professor» e o trabalho é apagado do computador dele. O registo fica guardado aqui.</p>
     </div>
   </div></div>

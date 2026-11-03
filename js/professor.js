@@ -4,7 +4,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, query, where, onSnapshot, doc, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp }
+import { getFirestore, collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const $ = id => document.getElementById(id);
@@ -38,7 +38,9 @@ onAuthStateChanged(auth, u => {
 });
 
 /* ---------- turma ---------- */
-$("turmaSel").innerHTML = TURMAS.map(t => `<option>${esc(t)}</option>`).join("");
+const TODAS = "*";
+const idAluno = (n, t) => (tid(t) + "_" + norm(n).replace(/ /g, "-")).slice(0, 80);
+$("turmaSel").innerHTML = TURMAS.map(t => `<option>${esc(t)}</option>`).join("") + `<option value="${TODAS}">— Todas as turmas —</option>`;
 try { const g = localStorage.getItem("cofre-prof-turma"); if (TURMAS.includes(g)) T = g; } catch (e) {}
 $("turmaSel").value = T;
 $("turmaSel").onchange = () => { T = $("turmaSel").value; try { localStorage.setItem("cofre-prof-turma", T); } catch (e) {} abrirTurma(); };
@@ -46,11 +48,22 @@ $("showVal").onchange = desenhar;
 
 function abrirTurma() {
   stops.forEach(f => f()); stops = []; linhas = []; abertas = {}; lista = ""; jaMarcados = new Set();
-  $("lista").value = ""; desenharMissoes(); desenhar();
+  $("lista").value = "";
+  const todas = T === TODAS;
+  $("missCard").classList.toggle("hidden", todas); $("listaCard").classList.toggle("hidden", todas);
+  desenharMissoes(); desenhar();
+  if (todas) {
+    stops.push(onSnapshot(collection(db, "cofre_registos"), snap => {
+      linhas = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(l => l.estado !== "movido")
+        .sort((a, b) => a.turma.localeCompare(b.turma, "pt") || a.nome.localeCompare(b.nome, "pt"));
+      desenhar();
+    }, erro));
+    return;
+  }
   stops.push(onSnapshot(doc(db, "cofre_controlo", tid(T)),
     s => { abertas = (s.exists() && s.data().abertas) || {}; desenharMissoes(); }, erro));
   stops.push(onSnapshot(query(collection(db, "cofre_registos"), where("turma", "==", T)), snap => {
-    linhas = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.nome.localeCompare(b.nome, "pt"));
+    linhas = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(l => l.estado !== "movido").sort((a, b) => a.nome.localeCompare(b.nome, "pt"));
     marcarApoio(); desenhar();
   }, erro));
   stops.push(onSnapshot(doc(db, "cofre_turmas", tid(T)), s => {
@@ -131,20 +144,22 @@ function desenhar() {
   let html = ver.map(l => {
     const p = l.prog || {}, v = l.estado === "validado";
     return `<tr class="${v ? "val" : ""}">
-      <td><b>${esc(l.nome)}</b><div class="where">⭐ ${l.estrelas || 0}/12</div></td>
+      <td><b>${esc(l.nome)}</b><div class="where">${esc(l.turma)} · ⭐ ${l.estrelas || 0}/12</div></td>
+      <td style="white-space:nowrap"><button class="btn ghost xs" data-ver="${l.id}">👁️ Ver</button> ${!v && l.concluido ? `<button class="btn okb xs" data-val="${l.id}">✅ Validar</button> ` : ""}<button class="btn ghost xs" data-del="${l.id}" title="Eliminar aluno" aria-label="Eliminar ${esc(l.nome)}">🗑️</button></td>
       <td>${l.concluido ? "🏅 Terminou" : esc(l.passo || "")}<div class="where">${quando(l)}</div></td>
       <td class="s">${st(p.m1)}</td><td class="s">${st(p.m2)}</td><td class="s">${st(p.m3)}</td>
       <td>${l.cadeado ? `<span class="mini">${lockSVG(l.cadeado)}</span> <span class="s" style="color:var(--brass-d)">${st(p.m4)}</span>` : st(p.m4)}</td>
       <td>${p.m5 && p.m5.done ? "🏅" : "—"}</td>
       <td><label class="tog" title="Medidas seletivas"><input type="checkbox" data-ap="${l.id}" ${l.apoio ? "checked" : ""} ${v ? "disabled" : ""}><span></span></label></td>
       <td>${v ? `<span class="pill y">Validado</span>` : l.concluido ? `<span class="pill s">Por validar</span>` : `<span class="pill n">A trabalhar</span>`}</td>
-      <td style="white-space:nowrap"><button class="btn ghost xs" data-ver="${l.id}">👁️ Ver</button> ${!v && l.concluido ? `<button class="btn okb xs" data-val="${l.id}">✅ Validar</button>` : ""}</td></tr>`;
+</tr>`;
   }).join("");
-  html += naoComecaram.map(n => `<tr class="nao"><td><b>${esc(n.nome)}</b>${n.apoio ? ' <span class="pill s">medidas</span>' : ""}</td><td colspan="9">Ainda não começou</td></tr>`).join("");
+  html += naoComecaram.map(n => `<tr class="nao"><td><b>${esc(n.nome)}</b>${n.apoio ? ' <span class="pill s">medidas</span>' : ""}</td><td></td><td colspan="8">Ainda não começou</td></tr>`).join("");
   $("rows").innerHTML = html || `<tr><td colspan="10" class="note" style="text-align:center;padding:30px">Ainda não há alunos desta turma. Quando um aluno escrever o nome, aparece aqui.</td></tr>`;
   $("rows").querySelectorAll("[data-ap]").forEach(x => x.onchange = () => updateDoc(doc(db, "cofre_registos", x.dataset.ap), { apoio: x.checked }).catch(erro));
   $("rows").querySelectorAll("[data-ver]").forEach(b => b.onclick = () => verAluno(b.dataset.ver));
   $("rows").querySelectorAll("[data-val]").forEach(b => b.onclick = () => validar([b.dataset.val], ""));
+  $("rows").querySelectorAll("[data-del]").forEach(b => b.onclick = () => eliminar(b.dataset.del));
 }
 
 /* ---------- ver, validar, recomeçar ---------- */
@@ -165,18 +180,43 @@ function verAluno(id) {
       <p class="note">A palavra-passe do aluno nunca sai do computador dele.</p></div></div>` : `<p class="note">Ainda não fez o cadeado.</p>`}
     ${l.concluido ? "" : `<p class="msg" style="margin-top:12px">Este aluno ainda não terminou todas as missões.</p>`}
     ${v ? "" : `<label class="lab" for="vAp">Apreciação (opcional)</label><select class="inp" id="vAp"><option value="">Sem apreciação</option>${["Excelente", "Muito bom", "Bom", "Satisfaz", "A melhorar"].map(x => `<option>${x}</option>`).join("")}</select>`}
+    ${v ? "" : `<label class="lab" for="vTur">Mudar de turma (o aluno fica com o trabalho que já fez)</label>
+      <div class="pwrow"><select class="inp" id="vTur">${TURMAS.map(t => `<option ${t === l.turma ? "selected" : ""}>${esc(t)}</option>`).join("")}</select><button class="btn ghost" id="vMove">🔀 Mudar</button></div>`}
+    <div class="pmsg bad" id="vMsg"></div>
     <div class="mbtns">
-      <button class="btn ghost" id="vDel">🔄 Recomeçar do zero</button>
+      <button class="btn ghost" id="vDel">🗑️ Eliminar aluno</button>
       <button class="btn ghost" id="vClose">Fechar</button>
       ${v ? "" : `<button class="btn okb" id="vOk">✅ ${l.concluido ? "Validar" : "Validar mesmo assim"}</button>`}
     </div>`;
   $("modal").classList.add("on");
   $("vClose").onclick = fechar;
   if ($("vOk")) $("vOk").onclick = () => { validar([id], $("vAp").value); fechar(); };
-  $("vDel").onclick = () => {
-    if (!confirm(`Apagar o registo de ${l.nome}? O aluno volta ao início e terá de fazer as missões outra vez.`)) return;
-    deleteDoc(doc(db, "cofre_registos", id)).catch(erro); fechar();
+  $("vDel").onclick = () => { if (eliminar(id)) fechar(); };
+  if ($("vMove")) $("vMove").onclick = async () => {
+    const nova = $("vTur").value; if (nova === l.turma) { $("vMsg").textContent = "Escolha outra turma."; return; }
+    $("vMove").disabled = true;
+    try { await mudarTurma(l, nova); fechar(); }
+    catch (e) { $("vMsg").textContent = e.message || String(e); $("vMove").disabled = false; }
   };
+}
+function eliminar(id) {
+  const l = linhas.find(x => x.id === id); if (!l) return false;
+  if (!confirm(`Eliminar ${l.nome} (${l.turma})? O registo é apagado e o aluno volta ao início no computador dele.`)) return false;
+  deleteDoc(doc(db, "cofre_registos", id)).catch(erro);
+  // apaga também os avisos de mudança de turma que apontavam para este aluno
+  const q = query(collection(db, "cofre_registos"), where("movidoPara", "==", id));
+  const stop = onSnapshot(q, snap => { stop(); snap.docs.forEach(d => deleteDoc(d.ref).catch(console.warn)); }, () => stop());
+  return true;
+}
+/* Copia o registo para a turma nova e deixa um aviso no antigo,
+   para o computador do aluno passar sozinho para a turma certa. */
+async function mudarTurma(l, nova) {
+  const novoId = idAluno(l.nome, nova);
+  if ((await getDoc(doc(db, "cofre_registos", novoId))).exists())
+    throw new Error(`Já existe um aluno com o nome ${l.nome} no ${nova}. Elimine um dos dois registos.`);
+  const { id, ...dados } = l;
+  await setDoc(doc(db, "cofre_registos", novoId), { ...dados, turma: nova, atualizado: serverTimestamp() });
+  await updateDoc(doc(db, "cofre_registos", l.id), { estado: "movido", movidoPara: novoId, turmaNova: nova, turma: "_movidos" });
 }
 async function validar(ids, ap) {
   if (!ids.length) return;

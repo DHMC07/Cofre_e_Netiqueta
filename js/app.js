@@ -42,10 +42,12 @@ $('easyBtn').onclick=()=>{LSset('cof4:easy',!document.body.classList.contains('e
 window.addEventListener('hashchange',()=>{if(S.name)detectApoio();});
 
 // ═══════════ LIGAÇÃO AO FIREBASE ═══════════
-// O progresso do aluno vai para o Firebase sempre que termina um passo ou uma missão.
-// O professor abre as missões e valida no painel (professor.html).
-let NUVEM=null,ABERTAS=null,CTL_WAIT=FB_CONFIGURADO,stopReg=null,stopCtl=null,criando=null,NETST=FB_CONFIGURADO?'sync':'off',PASSO='No mapa',HOME_MSG='';
+// O progresso do aluno vai para o Firebase sempre que muda de passo ou termina uma missão.
+// Cada aluno tem um registo com o nome dele e a turma. Se sair da página, mudar de computador
+// ou o navegador apagar os dados, basta voltar a escrever o mesmo nome e turma para continuar.
+let NUVEM=null,ABERTAS=null,CTL_WAIT=FB_CONFIGURADO,stopReg=null,stopCtl=null,EXISTE=false,LIGADO=false,NETST=FB_CONFIGURADO?'sync':'off',PASSO='No mapa',HOME_MSG='';
 const tid=t=>String(t).replace(/[^A-Za-z0-9]/g,'').slice(0,20)||'turma';
+const idAluno=(n,t)=>(tid(t)+'_'+norm(n).replace(/ /g,'-')).slice(0,80);
 const netTxt=()=>({ok:'☁️ Guardado',sync:'☁️ A ligar…',erro:'📴 Sem ligação: o trabalho fica guardado neste computador'})[NETST]||'';
 function setNet(s){NETST=s;const el=$('net');if(el)el.textContent=netTxt();}
 if(FB_CONFIGURADO){
@@ -56,37 +58,81 @@ if(FB_CONFIGURADO){
   }).catch(e=>{console.warn('Sem ligação ao Firebase:',e);CTL_WAIT=false;setNet('erro');refreshMap();});
 }
 function refreshMap(){if(S.screen==='map')renderMap();}
-function estado(){return {prog:S.prog,passo:String(PASSO).slice(0,60),cadeado:(S.prog.m4&&S.prog.m4.c)||null,estrelas:totalStars(),concluido:allDone()};}
+function estado(){
+  const c=S.cur?{id:S.cur.id,step:S.cur.step||0,ok:(S.cur.ok||[]).slice(0,5),draft:S.draft||null}:null;
+  return {prog:S.prog,passo:String(PASSO).slice(0,60),cur:c,cadeado:(S.prog.m4&&S.prog.m4.c)||null,estrelas:totalStars(),concluido:allDone()};}
+// junta o progresso deste computador com o que está no Firebase (fica sempre o melhor)
+function juntar(rp){let novo=false;
+  IDS.forEach(k=>{const r=rp&&rp[k],l=S.prog[k];if(!r||!r.done)return;
+    if(!l||!l.done){S.prog[k]=JSON.parse(JSON.stringify(r));novo=true;}
+    else if((r.stars||0)>(l.stars||0)){l.stars=r.stars;if(r.c)l.c=r.c;}});
+  return novo;}
+let aLigar=null;
+async function ligar(){
+  if(!NUVEM||!S.name||!S.key||S.valid)return;
+  if(aLigar)return aLigar;
+  const quem=S.key;
+  aLigar=(async()=>{
+    try{
+      if(!S.docId){S.docId=idAluno(S.name,S.turma);save();}
+      let d=await NUVEM.ler(S.docId);
+      if(quem!==S.key)return;
+      if(d&&d.estado==='movido'&&d.movidoPara){mudouTurma(d);return;}
+      if(d&&d.estado==='validado'){juntar(d.prog);validado(d);return;}
+      EXISTE=!!d;
+      if(d){
+        const vazio=!IDS.some(k=>(S.prog[k]||{}).done)&&!S.cur;
+        const novo=juntar(d.prog);
+        if(!S.cur&&d.cur&&d.cur.id&&!(S.prog[d.cur.id]||{}).done)S.cur={id:d.cur.id,step:d.cur.step||0,ok:d.cur.ok||[],d:{err:0}};
+        if(!S.draft&&d.cur&&d.cur.draft)S.draft=d.cur.draft;
+        if(d.nome&&d.nome!==S.name){S.name=d.nome;LSset('cof4:sess',{name:S.name,turma:S.turma});}
+        REMOTE_APOIO=!!d.apoio;save();detectApoio();
+        if(vazio&&(novo||S.cur)){toast('✅ Encontrámos o teu trabalho. Continua onde paraste!');}
+        if(S.screen==='map')renderMap();
+      }
+      LIGADO=true;vigiar();await sync();
+    }catch(e){console.warn('Não foi possível ligar ao Firebase:',e&&e.code,e);setNet('erro');CTL_WAIT=false;refreshMap();}
+  })().finally(()=>{aLigar=null;});
+  return aLigar;
+}
 async function sync(){
-  if(!NUVEM||!S.name||!S.key||S.valid)return;const quem=S.key;
+  if(!NUVEM||!S.name||!S.key||S.valid)return;
+  if(!LIGADO){ligar();return;}
   try{
-    if(!S.docId){
-      criando=criando||NUVEM.criar(Object.assign({nome:S.name.slice(0,60),nomeNorm:norm(S.name).slice(0,60),turma:S.turma},estado()));
-      const id=await criando;criando=null;if(quem!==S.key)return;
-      S.docId=id;save();vigiar();
-    }else await NUVEM.guardar(S.docId,estado());
+    if(!EXISTE){await NUVEM.criar(S.docId,Object.assign({nome:S.name.slice(0,60),nomeNorm:norm(S.name).slice(0,60),turma:S.turma},estado()));EXISTE=true;}
+    else await NUVEM.guardar(S.docId,estado());
     setNet('ok');
-  }catch(e){criando=null;console.warn('Não foi possível guardar no Firebase:',e&&e.code,e);setNet('erro');}
+  }catch(e){console.warn('Não foi possível guardar no Firebase:',e&&e.code,e);setNet('erro');}
 }
 let passoT=null;
-function syncPasso(t){PASSO=t;clearTimeout(passoT);passoT=setTimeout(sync,700);}
-function pararVigia(){stopReg&&stopReg();stopCtl&&stopCtl();stopReg=stopCtl=null;}
+function syncPasso(t){PASSO=t;clearTimeout(passoT);passoT=setTimeout(sync,600);}
+function pararVigia(){stopReg&&stopReg();stopCtl&&stopCtl();stopReg=stopCtl=null;LIGADO=false;EXISTE=false;}
 function vigiar(){
-  if(!NUVEM||!S.name)return;pararVigia();
+  if(!NUVEM||!S.name)return;stopReg&&stopReg();stopCtl&&stopCtl();
   let primeiro=true;
   stopCtl=NUVEM.vigiarControlo(tid(S.turma),a=>{
     const era=CTL_WAIT;CTL_WAIT=false;ABERTAS=a;if(a===null)setNet('erro');
-    if(S.screen==='map'){renderMap();if(era&&primeiro&&S.cur&&isOpen(S.cur.id))openMission(S.cur.id);}
+    if(S.screen==='map'){renderMap();if((era||primeiro)&&S.cur&&isOpen(S.cur.id))openMission(S.cur.id);}
     primeiro=false;});
-  if(S.docId)stopReg=NUVEM.vigiarRegisto(S.docId,d=>{
+  stopReg=NUVEM.vigiarRegisto(S.docId,d=>{
     if(d===undefined)return; // erro de leitura: tenta mais tarde
-    if(d===null){apagadoPeloProfessor();return;}
+    if(d===null){if(EXISTE)apagadoPeloProfessor();return;}
+    EXISTE=true;
+    if(d.estado==='movido'&&d.movidoPara){mudouTurma(d);return;}
     const ap=!!d.apoio;if(ap!==REMOTE_APOIO){REMOTE_APOIO=ap;detectApoio();refreshMap();}
     if(d.estado==='validado'&&!S.valid)validado(d);
   });
 }
-function ligar(){if(NUVEM&&S.name){vigiar();sync();}}
 addEventListener('online',()=>sync());
+// O professor mudou o aluno de turma: continua com o mesmo trabalho na turma certa.
+function mudouTurma(d){
+  const t=d.turmaNova;if(!t){apagadoPeloProfessor();return;}
+  const keep={prog:S.prog,cur:S.cur,draft:S.draft};
+  LSdel('cof4:p:'+S.key);pararVigia();
+  S.turma=t;S.key=norm(S.name)+'|'+t;S.docId=d.movidoPara;Object.assign(S,keep);save();LSset('cof4:sess',{name:S.name,turma:t});
+  ABERTAS=null;CTL_WAIT=true;cur=null;closeModal();toast('O professor mudou-te para a turma '+t+'.');
+  renderMap();ligar();
+}
 // O professor validou: mostra o certificado e apaga os dados deste computador.
 function validado(d){
   let data=today();try{if(d.validadoEm&&d.validadoEm.toDate)data=d.validadoEm.toDate().toLocaleDateString('pt-PT');}catch(e){}
@@ -94,10 +140,11 @@ function validado(d){
   LSdel('cof4:p:'+S.key);LSdel('cof4:help:'+S.key);LSdel('cof4:sess');S.key='';pararVigia();cur=null;closeModal();
   confetti();beep(880,.3);renderCert();
 }
+// O professor eliminou o registo: o aluno volta ao início.
 function apagadoPeloProfessor(){
   LSdel('cof4:p:'+S.key);LSdel('cof4:sess');pararVigia();
-  Object.assign(S,{key:'',prog:{},cur:null,draft:null,valid:null,docId:null});cur=null;PW='';closeModal();
-  HOME_MSG='O professor recomeçou o teu trabalho. Escreve o teu nome para começar de novo.';renderHome();
+  Object.assign(S,{name:'',turma:'',key:'',prog:{},cur:null,draft:null,valid:null,docId:null});cur=null;PW='';closeModal();
+  HOME_MSG='O professor apagou o teu registo. Escreve o teu nome e escolhe a turma certa para começar.';renderHome();
 }
 
 // ═══════════ RESPOSTAS: ACERTO E ERRO ═══════════

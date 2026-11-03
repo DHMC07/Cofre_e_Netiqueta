@@ -4,7 +4,7 @@
    ===================================================================== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, addDoc, doc, updateDoc, onSnapshot, serverTimestamp }
+import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const cfg = window.CONFIG && window.CONFIG.firebase;
@@ -25,22 +25,28 @@ if (ativo) {
   pronto.catch(() => {});
 }
 
-/* Cria o registo do aluno e devolve o seu id */
-export async function criar(d) {
-  const u = await pronto;
-  const ref = await addDoc(collection(db, "cofre_registos"), {
-    uid: u.uid, nome: d.nome, nomeNorm: d.nomeNorm, turma: d.turma,
-    prog: d.prog, passo: d.passo, cadeado: d.cadeado, estrelas: d.estrelas, concluido: d.concluido,
-    estado: "em_curso", apoio: false, criado: serverTimestamp(), atualizado: serverTimestamp()
-  });
-  return ref.id;
+/* Lê o registo do aluno (para continuar onde parou). Devolve null se não existir */
+export async function ler(id) {
+  await pronto;
+  const s = await getDoc(doc(db, "cofre_registos", id));
+  return s.exists() ? s.data() : null;
 }
 
-/* Atualiza o progresso do aluno */
+/* Cria o registo do aluno (o id é feito com a turma e o nome) */
+export async function criar(id, d) {
+  const u = await pronto;
+  await setDoc(doc(db, "cofre_registos", id), {
+    uid: u.uid, nome: d.nome, nomeNorm: d.nomeNorm, turma: d.turma,
+    prog: d.prog, passo: d.passo, cur: d.cur, cadeado: d.cadeado, estrelas: d.estrelas, concluido: d.concluido,
+    estado: "em_curso", apoio: false, criado: serverTimestamp(), atualizado: serverTimestamp()
+  });
+}
+
+/* Atualiza o progresso do aluno (também quando continua noutro computador) */
 export async function guardar(id, d) {
-  await pronto;
+  const u = await pronto;
   await updateDoc(doc(db, "cofre_registos", id), {
-    prog: d.prog, passo: d.passo, cadeado: d.cadeado, estrelas: d.estrelas, concluido: d.concluido,
+    uid: u.uid, prog: d.prog, passo: d.passo, cur: d.cur, cadeado: d.cadeado, estrelas: d.estrelas, concluido: d.concluido,
     atualizado: serverTimestamp()
   });
 }

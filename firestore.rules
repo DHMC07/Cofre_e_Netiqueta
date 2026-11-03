@@ -4,7 +4,7 @@ service cloud.firestore {
 
     // ===== O COFRE SECRETO (início) =====
     function cofreProf() {
-      return request.auth != null && request.auth.uid == 'COLE_AQUI_O_SEU_UID';
+      return request.auth != null && request.auth.uid == 'T7nqqi40IkWBp8mGCWvhkSYQNbg2';
     }
     function cofreAluno() {
       return request.auth != null && request.auth.token.firebase.sign_in_provider == 'anonymous';

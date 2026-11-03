@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===== O COFRE SECRETO (início) =====
+    function cofreProf() {
+      return request.auth != null && request.auth.uid == 'COLE_AQUI_O_SEU_UID';
+    }
+    function cofreAluno() {
+      return request.auth != null && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+    function cofreDados(d) {
+      return d.prog is map && d.prog.size() <= 5
+        && d.passo is string && d.passo.size() <= 60
+        && (d.cadeado == null || (d.cadeado is map && d.cadeado.size() <= 8))
+        && d.estrelas is int && d.estrelas >= 0 && d.estrelas <= 15
+        && d.concluido is bool
+        && d.atualizado == request.time;
+    }
+    // Definições das medidas: todos leem, só o professor altera
+    match /cofre_config/{id} {
+      allow read: if true;
+      allow write: if cofreProf();
+    }
+    // Missões abertas em cada turma: todos leem, só o professor altera
+    match /cofre_controlo/{turma} {
+      allow read: if true;
+      allow write: if cofreProf();
+    }
+    // Listas de alunos: só o professor
+    match /cofre_turmas/{turma} {
+      allow read, write: if cofreProf();
+    }
+    // Trabalho de cada aluno
+    match /cofre_registos/{id} {
+      allow list: if cofreProf();
+      allow get: if cofreProf()
+        || (cofreAluno() && (resource == null || resource.data.uid == request.auth.uid));
+      allow create: if cofreAluno()
+        && request.resource.data.keys().hasOnly(['uid','nome','nomeNorm','turma','prog','passo','cadeado','estrelas','concluido','estado','apoio','criado','atualizado'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.nome is string && request.resource.data.nome.size() >= 3 && request.resource.data.nome.size() <= 60
+        && request.resource.data.nomeNorm is string && request.resource.data.nomeNorm.size() <= 60
+        && request.resource.data.turma is string && request.resource.data.turma.size() <= 20
+        && request.resource.data.estado == 'em_curso'
+        && request.resource.data.apoio == false
+        && request.resource.data.criado == request.time
+        && cofreDados(request.resource.data);
+      // O aluno só atualiza o seu progresso, e só até o professor validar
+      allow update: if cofreProf() || (cofreAluno()
+        && resource.data.uid == request.auth.uid
+        && resource.data.estado == 'em_curso'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['prog','passo','cadeado','estrelas','concluido','atualizado'])
+        && cofreDados(request.resource.data));
+      allow delete: if cofreProf();
+    }
+    // ===== O COFRE SECRETO (fim) =====
+
+  }
+}

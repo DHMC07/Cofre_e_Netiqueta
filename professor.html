@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Painel do professor · O Cofre Secreto</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;700;800;900&family=Lexend:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+
+<section id="loginScr">
+  <div class="wrap"><div class="card login">
+    <h1>🔒 Painel do professor</h1>
+    <p class="note" style="font-size:16px;margin-bottom:16px">O Cofre Secreto · TIC 4.º ano</p>
+    <label class="lab" for="email">Email</label><input class="inp" id="email" type="email" autocomplete="username">
+    <label class="lab" for="pass">Palavra-passe</label><input class="inp" id="pass" type="password" autocomplete="current-password">
+    <div class="msg" id="loginMsg"></div>
+    <button class="btn big" id="loginBtn" style="width:100%">Entrar</button>
+  </div></div>
+</section>
+
+<section id="panelScr" class="hidden">
+  <div class="ptop"><h1>🔐 O Cofre Secreto · Painel do professor</h1><span class="em" id="who"></span><button class="btn ghost small" id="logoutBtn">Sair</button></div>
+  <div class="pwrap"><div class="pgrid">
+    <aside class="side">
+      <div class="card"><label class="lab" for="turmaSel" style="margin-top:0">Turma</label><select class="inp" id="turmaSel"></select></div>
+      <div class="card">
+        <h2>Missões abertas</h2>
+        <p class="note">Abra cada missão quando chegar a essa parte da aula. Abre logo em todos os computadores da turma.</p>
+        <div id="missRows"></div>
+        <div class="mbtns" style="justify-content:flex-start;margin-top:12px"><button class="btn small" id="openNext">🔓 Abrir a próxima</button><button class="btn ghost small" id="closeAll">Fechar todas</button></div>
+        <div class="pmsg" id="ctlMsg"></div>
+      </div>
+      <details class="card">
+        <summary class="lab" style="margin:0;cursor:pointer;font-size:17px;color:var(--ink)">📋 Lista da turma</summary>
+        <p class="note">Um aluno por linha (nome e apelido). Ponha <b>*</b> no fim do nome dos alunos com medidas seletivas, por exemplo <b>Ana Silva *</b>. Assim vê também quem ainda não começou.</p>
+        <textarea class="inp" id="lista" rows="9" style="font-size:16px"></textarea>
+        <div class="mbtns" style="justify-content:flex-start;margin-top:8px"><button class="btn small" id="saveLista">Guardar lista</button></div>
+        <div class="pmsg" id="listaMsg"></div>
+      </details>
+      <details class="card">
+        <summary class="lab" style="margin:0;cursor:pointer;font-size:17px;color:var(--ink)">⚙️ Medidas</summary>
+        <div class="checks">
+          <p class="note"><b>Universal</b> (todos os alunos)</p>
+          <label><input type="checkbox" id="mLei"> Botão «Leitura fácil»</label>
+          <p class="note"><b>Seletivas</b> (só os alunos marcados)</p>
+          <label><input type="checkbox" id="mMen"> Menos perguntas e menos opções</label>
+          <label><input type="checkbox" id="mTem"> Mais tempo: sem avanço automático</label>
+          <label><input type="checkbox" id="mCad"> Cadeado com 8 caracteres e dica para ditar</label>
+          <label><input type="checkbox" id="mEst"> Estrelas que não penalizam as tentativas</label>
+        </div>
+        <div class="mbtns" style="justify-content:flex-start;margin-top:8px"><button class="btn small" id="saveMed">Guardar</button></div>
+        <div class="pmsg" id="medMsg"></div>
+      </details>
+    </aside>
+    <div>
+      <div class="chips" id="stats"></div>
+      <div class="tools">
+        <button class="btn okb small" id="valAll">✅ Validar todos os que terminaram</button>
+        <button class="btn ghost small" id="csvBtn">📄 Exportar CSV</button>
+        <label style="display:flex;gap:6px;align-items:center;font-weight:800"><input type="checkbox" id="showVal"> Mostrar validados</label>
+      </div>
+      <div class="card" style="padding:0;overflow-x:auto"><table class="res">
+        <thead><tr><th>Aluno</th><th>Onde está</th><th>1 · Níveis</th><th>2 · Netiqueta</th><th>3 · Cenários</th><th>4 · Cadeado</th><th>5 · Promessa</th><th>Medidas</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="rows"><tr><td colspan="10" class="note" style="text-align:center;padding:30px">A carregar…</td></tr></tbody>
+      </table></div>
+      <p class="note">Ao validar, o certificado do aluno recebe o carimbo «Validado pelo professor» e o trabalho é apagado do computador dele. O registo fica guardado aqui.</p>
+    </div>
+  </div></div>
+</section>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true"><div class="mbox" id="mBox"></div></div>
+<script src="js/firebase-config.js"></script>
+<script src="js/comum.js"></script>
+<script>
+  if(!window.CONFIG||String((window.CONFIG.firebase||{}).apiKey).startsWith("COLE")){
+    document.getElementById("loginMsg").textContent="Falta colar os dados do Firebase no ficheiro js/firebase-config.js.";
+    document.getElementById("loginBtn").disabled=true;
+  }
+</script>
+<script type="module" src="js/professor.js"></script>
+</body>
+</html>
